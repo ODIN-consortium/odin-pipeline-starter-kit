@@ -1,0 +1,46 @@
+/* Auto-generated environment branding — do not edit manually */
+
+/* Apply the environment header gradient to the sidebar */
+.sidebar-drawer {
+    background: linear-gradient(rgb(145,240,237), rgb(0, 46, 122)) !important;
+}
+
+/* CSS variables — some Furo internals read these */
+:root {
+    --color-sidebar-background: transparent;
+    --color-sidebar-caption-text: rgb(230, 230, 230);
+    --color-sidebar-link-text: rgb(230, 230, 230);
+    --color-sidebar-link-text--top-level: rgb(230, 230, 230);
+    --color-sidebar-item-background--hover: rgba(255, 255, 255, 0.12);
+    --color-sidebar-item-background--current: rgba(255, 255, 255, 0.18);
+    --color-sidebar-item-expander-background: transparent;
+    --color-sidebar-item-expander-background--hover: rgba(255, 255, 255, 0.12);
+    --color-sidebar-search-background: rgba(255, 255, 255, 0.15);
+    --color-sidebar-search-foreground: rgb(230, 230, 230);
+    --color-sidebar-search-border: rgba(255, 255, 255, 0.3);
+    --color-sidebar-search-icon: rgb(230, 230, 230);
+}
+
+/* Direct element selectors — override Furo's color-brand-primary on links,
+   which would otherwise blend into the gradient background */
+.sidebar-drawer .sidebar-brand-text,
+.sidebar-drawer .sidebar-tree a,
+.sidebar-drawer .sidebar-tree .reference,
+.sidebar-drawer .toc-tree a {
+    color: rgb(230, 230, 230) !important;
+}
+.sidebar-drawer .sidebar-tree a:hover,
+.sidebar-drawer .sidebar-tree .reference:hover {
+    color: rgb(230, 230, 230) !important;
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.12);
+}
+.sidebar-drawer .sidebar-tree .current > a,
+.sidebar-drawer .sidebar-tree .current > .reference {
+    color: rgb(230, 230, 230) !important;
+    background: rgba(255, 255, 255, 0.18);
+}
+.sidebar-drawer .caption-text {
+    color: rgb(230, 230, 230) !important;
+    opacity: 0.75;
+}

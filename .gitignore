@@ -1,0 +1,30 @@
+# Local environment — contains machine-specific paths, do not commit
+.env
+
+# Runtime artefacts under pipeline/ — do not commit
+pipeline/nf/
+pipeline/output/
+pipeline/work/
+pipeline/.nextflow/
+pipeline/*.log
+pipeline/.odin-app
+# App state
+data/
+
+# Pipeline-specific output directories
+pipeline/biomeme/biomeme_processed/
+pipeline/enlighten/data
+
+# Corporate CA certs — place in pipeline/ca/ folder, but never commit
+pipeline/ca/*.cer
+pipeline/ca/*.crt
+pipeline/ca/*.pem
+ca/
+
+# Editor
+.DS_Store
+Thumbs.db
+
+# Sphinx build cache — the Enlighten user manual ships as pre-built HTML
+pipeline/enlighten/**/.doctrees/
+pipeline/enlighten/**/.buildinfo

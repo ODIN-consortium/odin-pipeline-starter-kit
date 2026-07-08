@@ -1,0 +1,38 @@
+[
+  {
+    "id": "1734541043400001",
+    "name": "${dataset_name}",
+    "columns": 1,
+    "tiles": [
+      {
+        "id": "_amr_summary_table_1756203135877",
+        "scaleFactor": 30,
+        "pageId": "${chunk_id}",
+        "rawData": false,
+        "hasRawData": false,
+        "lastDraw": 0,
+        "recommendedDrawLoad": 20,
+        "recommendedDrawSteps": 2,
+        "plotModels": [],
+        "sizeFactor": 1,
+        "hasFilters": false,
+        "qcFilter": false,
+        "info": "",
+        "legendVisible": false,
+        "activeProbe": false,
+        "trackValue": false,
+        "playback": false,
+        "rowSpan": 1,
+        "colSpan": 1,
+        "type": "table",
+        "dataset": "${dataset}",
+        "datasetType": "dataset",
+        "columns": [],
+        "filters": {},
+        "bounds": {},
+        "mapSettings": null,
+        "cesiumSettings": null
+      }
+    ]
+  }
+]

@@ -1,0 +1,173 @@
+# Docker Compose — works with Docker Engine (default) or rootless Podman
+# (set ODIN_CONTAINER_SOCK and ODIN_UI_PORT in .env — see TROUBLESHOOTING.md).
+#
+# Every variable is documented in .env.example. Fallbacks in this file are
+# deliberately LITERAL-only: podman-compose cannot expand variables inside
+# ${VAR:-...} fallbacks, so defaults derived from ODIN_PIPELINE_ROOT live in
+# the backend, not here.
+#
+# SECURITY: the API is never published on a host port — only the nginx
+# frontend reaches it. Under Docker the runtime socket is root-owned (consider
+# the Tecnativa Docker Socket Proxy); under rootless Podman it is user-owned.
+# See SECURITY.md.
+#
+# Path constraint (DooD): Nextflow sibling containers resolve data paths on
+# the HOST filesystem — every host data directory is therefore mounted at the
+# IDENTICAL absolute path (host_path:host_path).
+
+services:
+  odin-app-api:
+    image: ghcr.io/odin-consortium/odin-pipeline-api:v1.0.38@sha256:773d71a30675343dbdd346d3870c770b117732f2f615e300ee72dd3e5c6971ca
+    container_name: odin-app-api
+    restart: unless-stopped
+    volumes:
+      # Container runtime socket for spawning pipeline containers (DooD).
+      # Container-side path is constant so the Docker CLI and Nextflow are
+      # oblivious to the engine behind it.
+      - ${ODIN_CONTAINER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      # The data root — REQUIRED, no default. Everything defaults under it.
+      - ${ODIN_PIPELINE_ROOT}:${ODIN_PIPELINE_ROOT}
+      # FASTQ concat workspace (staged inputs for task containers).
+      - ${ODIN_TMP_DIR:-/var/tmp}:${ODIN_TMP_DIR:-/var/tmp}
+      # Nextflow work dir — keep on native Linux storage (not /mnt/*).
+      - ${ODIN_WORK_DIR:-/tmp/odin_work}:${ODIN_WORK_DIR:-/tmp/odin_work}
+      # Optional relocations: no-op paths when unset, so relocating logs,
+      # databases or MinKNOW data is a pure .env change.
+      - ${ODIN_LOG_DIR:-/tmp/odin-noop/logs}:${ODIN_LOG_DIR:-/tmp/odin-noop/logs}
+      - ${ODIN_DATABASE_PATH:-/tmp/odin-noop/databases}:${ODIN_DATABASE_PATH:-/tmp/odin-noop/databases}:ro
+      - ${ODIN_MINKNOW_DIR:-/tmp/odin-noop/minknow}:${ODIN_MINKNOW_DIR:-/tmp/odin-noop/minknow}
+      # App state (SQLite) on a named volume. NOTE: shared by ALL checkouts
+      # of this repo on the machine (see TROUBLESHOOTING.md).
+      - odin-demo-data:/app/data
+    environment:
+      # Login — same values the frontend uses (setup.sh generates them).
+      - ODIN_AUTH_USER=${ODIN_AUTH_USER:-}
+      - ODIN_AUTH_PASSWORD=${ODIN_AUTH_PASSWORD:-}
+      # The data root (see volumes above).
+      - ODIN_PIPELINE_ROOT=${ODIN_PIPELINE_ROOT}
+      # Device/operator name, stamped on every record — set it in .env.
+      # There is deliberately no fallback: unset means records carry NULL
+      # and the Sync page warns.
+      - ODIN_DEVICE_NAME=${ODIN_DEVICE_NAME:-}
+      # Optional overrides; empty means the backend computes the default
+      # under ODIN_PIPELINE_ROOT (seed/, nf/assets, nf/store,
+      # enlighten/data, minknow/, input_sheets/...). If an override points
+      # OUTSIDE the root, add the matching identical mount above.
+      - ODIN_TMP_DIR=${ODIN_TMP_DIR:-/var/tmp}
+      - ODIN_WORK_DIR=${ODIN_WORK_DIR:-}
+      - ODIN_LOG_DIR=${ODIN_LOG_DIR:-}
+      - ODIN_DATABASE_PATH=${ODIN_DATABASE_PATH:-}
+      - ODIN_MINKNOW_DIR=${ODIN_MINKNOW_DIR:-}
+      - ODIN_SEED_DIR=${ODIN_SEED_DIR:-}
+      - NXF_ASSETS=${NXF_ASSETS:-}
+      - ODIN_STORE_DIR=${ODIN_STORE_DIR:-}
+      - ODIN_ENLIGHTEN_DATA_PATH=${ODIN_ENLIGHTEN_DATA_PATH:-}
+      - ODIN_DATABASES_FILE=${ODIN_DATABASES_FILE:-}
+      # Pathogen list. Empty → <root>/input_sheets/pathogens.yaml, which
+      # init_pipeline_tree.sh installs from the deployment profile on a field
+      # data folder. The demo stack has no such copy: setup.sh points this at
+      # pipeline/deployments/mobile_lab_2025/pathogens.yaml in .env.
+      - ODIN_PATHOGENS_FILE=${ODIN_PATHOGENS_FILE:-}
+      # Optional overlay on the column descriptions written into every feather
+      # (default: $ODIN_PIPELINE_ROOT/config/dataset_columns.yaml if present).
+      - ODIN_DATASET_COLUMNS_FILE=${ODIN_DATASET_COLUMNS_FILE:-}
+      - ODIN_CA_CERT=${ODIN_CA_CERT:-}
+      # Pipeline pins and integration endpoints.
+      - TAXPROFILER_REVISION=${TAXPROFILER_REVISION:-1.2.6}
+      - WF_METAGENOMICS_REVISION=${WF_METAGENOMICS_REVISION:-v2.14.2}
+      - TAXPROFILER_DIR=${TAXPROFILER_DIR:-}
+      - NEXTFLOW_CONFIG_FILE=${NEXTFLOW_CONFIG_FILE:-/app/config/odin.config}
+      - ODIN_ENLIGHTEN_URL=${ODIN_ENLIGHTEN_URL:-http://localhost:8080}
+      # Must match the image tag in the squirrel service below.
+      - SQUIRREL_IMAGE=${SQUIRREL_IMAGE:-docker.io/articnetworkorg/squirrel:1.3.2}
+
+  # No-op service that pre-pulls the squirrel image at `up` time so the first
+  # mpox post-processing run doesn't pull on demand.
+  squirrel:
+    image: ${SQUIRREL_IMAGE:-docker.io/articnetworkorg/squirrel:1.3.2}
+    entrypoint: ["true"]
+    restart: "no"
+
+  odin-app-client:
+    image: ghcr.io/odin-consortium/odin-pipeline-ui:v1.0.38@sha256:d591122ba780aa9ea661bc41138be4ca7c40aa4d6ac36bab0bb080796b132198
+    container_name: odin-app-client
+    restart: unless-stopped
+    ports:
+      # Loopback-only (see SECURITY.md). ODIN_UI_PORT: override when port 80
+      # is taken or under rootless Podman (cannot bind <1024; use 8099).
+      - "127.0.0.1:${ODIN_UI_PORT:-80}:80"
+    environment:
+      # Login for the whole app (UI + /api/ proxy). Empty disables auth.
+      - ODIN_AUTH_USER=${ODIN_AUTH_USER:-}
+      - ODIN_AUTH_PASSWORD=${ODIN_AUTH_PASSWORD:-}
+    depends_on:
+      - odin-app-api
+
+  # ── Enlighten visualisation services ─────────────────────────────────────────
+  # Standalone pathogen-explorer UI backed by the Feather datasets ODIN's
+  # post-processing writes under $ODIN_PIPELINE_ROOT/enlighten/data.
+  # Access: http://localhost:8080 (ODIN app: http://localhost[:ODIN_UI_PORT]).
+
+  enlweb-api:
+    image: docker.io/norceresearch1/enlweb-api:2026.9.1@sha256:49c4d8a69122c7a0b8c76f2694956dd22c0132eed421f8f8b65a864952f467f7
+    container_name: enlweb-api-odin-demo
+    # Loopback-only (see SECURITY.md).
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      # Config, datasets and static assets all live under the data root, so
+      # they follow ODIN_PIPELINE_ROOT wherever it points.
+      - ${ODIN_PIPELINE_ROOT}/enlighten/config:/appconfig:ro
+      - ${ODIN_PIPELINE_ROOT}/enlighten/data:/appdata/data:ro
+      - ${ODIN_PIPELINE_ROOT}/enlighten/files/public:/appdata/files/public:ro
+      # Corporate CA cert (leave ENL_CERT_PATH unset for external/demo use).
+      - ${ENL_CERT_PATH:-/nonexistent}:/app/cert:ro
+    restart: unless-stopped
+    healthcheck:
+      # Python, not curl: the enlweb-api image dropped curl in 2026.9.1 (its own HEALTHCHECK
+      # uses this same call). With the curl test the service never became healthy and
+      # enlweb-client, which waits for it, never started.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=8)"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  enlweb-client:
+    image: docker.io/norceresearch1/enlweb-client:2026.9.2@sha256:4a76340b5d55fefcc5eaf43defaf258413f2775795456a3d4ca632807bbef53b
+    container_name: enlweb-client-odin-demo
+    # Loopback-only; port 80 belongs to odin-app-client.
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      enlweb-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # 127.0.0.1, not localhost: nginx in the client image listens on IPv4 only and busybox
+      # wget resolves localhost to ::1 first, so the image's own check has always failed.
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+volumes:
+  odin-demo-data:
+    name: odin-demo-data
